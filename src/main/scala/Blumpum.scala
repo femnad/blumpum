@@ -9,7 +9,10 @@ object Constants {
 
 object Blumpum extends App {
 
-  def getBasicAuthHeaderValue(username: String, password: String) = {
+  def getBasicAuthHeaderValue() = {
+    val conf = ConfigFactory.load()
+    val username = conf.getString("blumpum.username")
+    val password = conf.getString("blumpum.password")
     val usernamePasswordEncoded = Base64.encodeString(s"$username:$password")
     s"Basic $usernamePasswordEncoded"
   }
@@ -18,23 +21,26 @@ object Blumpum extends App {
     posts.map(post => post.attribute("description").getOrElse("<no description>").toString)
   }
 
-  val conf = ConfigFactory.load()
-  val username = conf.getString("blumpum.username")
-  val password = conf.getString("blumpum.password")
+  def getPosts(numberOfPosts: Int) = {
+    val basicAuthValue = getBasicAuthHeaderValue()
 
-  val numberOfPosts = if (args.isEmpty) Constants.DefaultNumberOfPosts.toString else args.head
+    val response = Http(s"${Constants.BaseApiUrl}/posts/all")
+      .param("results", "$numberOfPosts")
+      .header("Authorization", basicAuthValue)
+      .asString
 
-  val basicAuthValue = getBasicAuthHeaderValue(username, password)
-
-  val response = Http(s"${Constants.BaseApiUrl}/posts/all").param("results", numberOfPosts)
-    .header("Authorization", basicAuthValue).asString
-
-  if (response.code == 200) {
-    val postsXML = xml.XML.loadString(response.body)
-    val posts = postsXML.child.filter(c => c.attributes.nonEmpty)
-    val descriptions = getDescriptions(posts)
-    println(descriptions.mkString("\n"))
-  } else {
-    throw new Error(s"Not OK response code: ${response.code}")
+    if (response.code == 200) {
+      val postsXML = xml.XML.loadString(response.body)
+      postsXML.child.filter(c => c.attributes.nonEmpty)
+    } else {
+      throw new Error(s"Not OK response code: ${response.code}")
+    }
   }
+
+  val numberOfPosts = if (args.isEmpty) Constants.DefaultNumberOfPosts else args.head.toInt
+
+  val posts = getPosts(numberOfPosts)
+  val descriptions = getDescriptions(posts)
+
+  println(posts.mkString("\n"))
 }
