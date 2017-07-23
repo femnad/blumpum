@@ -1,20 +1,22 @@
 import com.typesafe.config.ConfigFactory
+import org.jsoup.Jsoup
 import scalaj.http.Http
 import scalaj.http.Base64
 
 object Constants {
   val BaseApiUrl = "https://api.pinboard.in/v1"
   val DefaultNumberOfPosts = 10
+  val UntitledDescriptions = Set("", "untitled")
 }
 
 object Blumpum extends App {
 
-  def getBasicAuthHeaderValue() = {
+  def getBasicAuthHeader() = {
     val conf = ConfigFactory.load()
     val username = conf.getString("blumpum.username")
     val password = conf.getString("blumpum.password")
     val usernamePasswordEncoded = Base64.encodeString(s"$username:$password")
-    s"Basic $usernamePasswordEncoded"
+    ("Authorization", s"Basic $usernamePasswordEncoded")
   }
 
   def getDescriptions(posts: Seq[xml.Node]): Seq[String] = {
@@ -22,11 +24,11 @@ object Blumpum extends App {
   }
 
   def getPosts(numberOfPosts: Int) = {
-    val basicAuthValue = getBasicAuthHeaderValue()
+    val basicAuthHeader = getBasicAuthHeader()
 
     val response = Http(s"${Constants.BaseApiUrl}/posts/all")
       .param("results", s"$numberOfPosts")
-      .header("Authorization", basicAuthValue)
+      .headers(basicAuthHeader)
       .asString
 
     if (response.code == 200) {
@@ -35,6 +37,42 @@ object Blumpum extends App {
     } else {
       throw new Error(s"Not OK response code: ${response.code}")
     }
+  }
+
+  def getPostTitle(postLink: String) = {
+    val document = Jsoup.connect(postLink).get()
+    document.select("title").text
+  }
+
+  def getUntitledPosts() = {
+    val allPosts = getPosts(0)
+    allPosts.filter(post => Constants.UntitledDescriptions.contains(
+      getFirstAttributeAsString(post, "description")))
+  }
+
+  def updatePost(url: String, description: String) = {
+    val basicAuthHeader = getBasicAuthHeader()
+
+    Http(s"${Constants.BaseApiUrl}/posts/add")
+      .param("url", url).param("description", description)
+      .headers(basicAuthHeader)
+      .asString
+  }
+
+  def getFirstAttributeAsString(node: xml.Node, attribute: String) = {
+    node.attribute(attribute).get.head.toString
+  }
+
+  def getTitleAndUpdatePost(post: xml.Node) = {
+    val postLink = getFirstAttributeAsString(post, "href")
+    val postTitle = getPostTitle(postLink)
+
+    updatePost(postLink, postTitle)
+  }
+
+  def setDescriptionForUntitledPosts() {
+    val untitledPosts = getUntitledPosts()
+    untitledPosts.foreach(getTitleAndUpdatePost)
   }
 
   val numberOfPosts = if (args.isEmpty) Constants.DefaultNumberOfPosts else args.head.toInt
