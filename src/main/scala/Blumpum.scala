@@ -25,7 +25,7 @@ object Blumpum extends App {
     val basicAuthValue = getBasicAuthHeaderValue()
 
     val response = Http(s"${Constants.BaseApiUrl}/posts/all")
-      .param("results", "$numberOfPosts")
+      .param("results", s"$numberOfPosts")
       .header("Authorization", basicAuthValue)
       .asString
 
