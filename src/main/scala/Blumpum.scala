@@ -1,7 +1,7 @@
 import com.typesafe.config.ConfigFactory
 import org.jsoup.Jsoup
-import scalaj.http.Http
-import scalaj.http.Base64
+
+import scalaj.http.{Base64, Http, HttpRequest, HttpResponse}
 
 object Constants {
   val BaseApiUrl = "https://api.pinboard.in/v1"
@@ -11,7 +11,10 @@ object Constants {
 
 object Blumpum extends App {
 
-  def getBasicAuthHeader() = {
+  type Post = xml.Node
+  type Posts = Seq[Post]
+
+  def buildBasicAuthHeader(): (String, String) = {
     val conf = ConfigFactory.load()
     val username = conf.getString("blumpum.username")
     val password = conf.getString("blumpum.password")
@@ -19,16 +22,17 @@ object Blumpum extends App {
     ("Authorization", s"Basic $usernamePasswordEncoded")
   }
 
-  def getDescriptions(posts: Seq[xml.Node]): Seq[String] = {
+  def authenticatedGetRequest(url: String): HttpRequest = {
+    Http(url).headers(buildBasicAuthHeader())
+  }
+
+  def getDescriptions(posts: Seq[Post]): Seq[String] = {
     posts.map(post => post.attribute("description").getOrElse("<no description>").toString)
   }
 
-  def getPosts(numberOfPosts: Int) = {
-    val basicAuthHeader = getBasicAuthHeader()
-
-    val response = Http(s"${Constants.BaseApiUrl}/posts/all")
+  def getPosts(numberOfPosts: Int = 0): Posts = {
+    val response = authenticatedGetRequest(s"${Constants.BaseApiUrl}/posts/all")
       .param("results", s"$numberOfPosts")
-      .headers(basicAuthHeader)
       .asString
 
     if (response.code == 200) {
@@ -39,40 +43,51 @@ object Blumpum extends App {
     }
   }
 
-  def getPostTitle(postLink: String) = {
+  def getPostTitle(postLink: String): String = {
     val document = Jsoup.connect(postLink).get()
     document.select("title").text
   }
 
-  def getUntitledPosts() = {
-    val allPosts = getPosts(0)
+  def getUntitledPosts: Posts = {
+    val allPosts = getPosts()
     allPosts.filter(post => Constants.UntitledDescriptions.contains(
       getFirstAttributeAsString(post, "description")))
   }
 
-  def updatePost(url: String, description: String) = {
-    val basicAuthHeader = getBasicAuthHeader()
-
-    Http(s"${Constants.BaseApiUrl}/posts/add")
+  def updatePost(url: String, description: String): HttpResponse[String] = {
+    authenticatedGetRequest(s"${Constants.BaseApiUrl}/posts/add")
       .param("url", url).param("description", description)
-      .headers(basicAuthHeader)
       .asString
   }
 
-  def getFirstAttributeAsString(node: xml.Node, attribute: String) = {
+  def getFirstAttributeAsString(node: Post, attribute: String): String = {
     node.attribute(attribute).get.head.toString
   }
 
-  def getTitleAndUpdatePost(post: xml.Node) = {
+  def getTitleAndUpdatePost(post: Post): HttpResponse[String] = {
     val postLink = getFirstAttributeAsString(post, "href")
     val postTitle = getPostTitle(postLink)
 
     updatePost(postLink, postTitle)
   }
 
-  def setDescriptionForUntitledPosts() {
-    val untitledPosts = getUntitledPosts()
+  def setDescriptionForUntitledPosts(): Unit = {
+    val untitledPosts = getUntitledPosts
     untitledPosts.foreach(getTitleAndUpdatePost)
+  }
+
+  def getPostTags(post: Post): Array[String] = {
+    getFirstAttributeAsString(post, "tag").split(" ").filterNot(tag => tag.isEmpty)
+  }
+
+  def getUntaggedPosts: Posts = {
+    getPosts().filter(post => getPostTags(post).length == 0)
+  }
+
+  def suggestTagForPost(post: Post): HttpResponse[String] = {
+    val url = getFirstAttributeAsString(post, "href")
+    authenticatedGetRequest(s"${Constants.BaseApiUrl}/posts/suggest")
+      .param("url", url).asString
   }
 
   val numberOfPosts = if (args.isEmpty) Constants.DefaultNumberOfPosts else args.head.toInt
