@@ -33,7 +33,7 @@ object Bookmark {
     val url = Bookmark.getUrl(post)
     val tags = Bookmark.getTags(post)
 
-    Bookmark(title, url, tags)
+    Bookmark(url, title, tags)
   }
 }
 
@@ -85,7 +85,7 @@ object Blumpum extends App {
 
   def getTitleAndUpdatePost(post: Post): HttpResponse[String] = {
     val postLink = Bookmark.getUrl(post)
-    val postTitle = Bookmark.getTitle(post)
+    val postTitle = getPostTitle(postLink)
 
     updatePost(postLink, postTitle)
   }
