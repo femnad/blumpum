@@ -77,17 +77,19 @@ object Blumpum extends App {
     allPosts.filter(post => Constants.UntitledDescriptions.contains(Bookmark.getTitle(post)))
   }
 
-  def updatePost(url: String, description: String): HttpResponse[String] = {
+  def updatePost(url: String, description: String, tags: Seq[String]): HttpResponse[String] = {
     authenticatedGetRequest(s"${Constants.BaseApiUrl}/posts/add")
       .param("url", url).param("description", description)
+      .param("tags", tags.mkString(","))
       .asString
   }
 
   def getTitleAndUpdatePost(post: Post): HttpResponse[String] = {
     val postLink = Bookmark.getUrl(post)
     val postTitle = getPostTitle(postLink)
+    val tags = Bookmark.getTags(post)
 
-    updatePost(postLink, postTitle)
+    updatePost(postLink, postTitle, tags)
   }
 
   def setDescriptionForUntitledPosts(): Unit = {
