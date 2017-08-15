@@ -14,7 +14,7 @@ case class Bookmark(url: String, title: String, tags: Array[String]) {
 }
 
 object Bookmark {
-  import Blumpum.Post
+  type Post = xml.Node
 
   def getFirstAttributeAsString(node: Post, attribute: String): String = {
     node.attribute(attribute).get.head.toString
@@ -38,10 +38,6 @@ object Bookmark {
 }
 
 object Blumpum extends App {
-
-  type Post = xml.Node
-  type Posts = Seq[Post]
-
   def buildBasicAuthHeader(): (String, String) = {
     val conf = ConfigFactory.load()
     val username = conf.getString("blumpum.username")
@@ -54,7 +50,7 @@ object Blumpum extends App {
     Http(url).headers(buildBasicAuthHeader())
   }
 
-  def getPosts(numberOfPosts: Int = 0): Posts = {
+  def getPosts(numberOfPosts: Int = 0): Seq[Bookmark] = {
     val response = authenticatedGetRequest(s"${Constants.BaseApiUrl}/posts/all")
       .param("results", s"$numberOfPosts")
       .asString
@@ -62,6 +58,7 @@ object Blumpum extends App {
     if (response.code == 200) {
       val postsXML = xml.XML.loadString(response.body)
       postsXML.child.filter(c => c.attributes.nonEmpty)
+        .map(Bookmark.getBookmarkFromPost)
     } else {
       throw new Error(s"Not OK response code: ${response.code}")
     }
@@ -72,9 +69,8 @@ object Blumpum extends App {
     document.select("title").text
   }
 
-  def getUntitledPosts: Posts = {
-    val allPosts = getPosts()
-    allPosts.filter(post => Constants.UntitledDescriptions.contains(Bookmark.getTitle(post)))
+  def getUntitledPosts: Seq[Bookmark] = {
+    getPosts().filter(bookmark => Constants.UntitledDescriptions.contains(bookmark.title))
   }
 
   def updatePost(url: String, description: String, tags: Seq[String]): HttpResponse[String] = {
@@ -84,12 +80,8 @@ object Blumpum extends App {
       .asString
   }
 
-  def getTitleAndUpdatePost(post: Post): HttpResponse[String] = {
-    val postLink = Bookmark.getUrl(post)
-    val postTitle = getPostTitle(postLink)
-    val tags = Bookmark.getTags(post)
-
-    updatePost(postLink, postTitle, tags)
+  def getTitleAndUpdatePost(bookmark: Bookmark): HttpResponse[String] = {
+    updatePost(bookmark.url, bookmark.title, bookmark.tags)
   }
 
   def setDescriptionForUntitledPosts(): Unit = {
@@ -97,20 +89,22 @@ object Blumpum extends App {
     untitledPosts.foreach(getTitleAndUpdatePost)
   }
 
-  def getUntaggedPosts: Posts = {
-    getPosts().filter(post => Bookmark.getTags(post).isEmpty)
+  def getUntaggedPosts: Seq[Bookmark] = {
+    getPosts().filter(bookmark => bookmark.tags.isEmpty)
   }
 
-  def suggestTagForPost(post: Post): HttpResponse[String] = {
-    val url = Bookmark.getUrl(post)
+  def suggestTagForPost(bookmark: Bookmark): HttpResponse[String] = {
     authenticatedGetRequest(s"${Constants.BaseApiUrl}/posts/suggest")
-      .param("url", url).asString
+      .param("url", bookmark.url).asString
+  }
+
+  def findPostsTaggedWith(tag: String): Seq[Bookmark] = {
+    getPosts().filter(bookmark => bookmark.tags.contains(tag))
   }
 
   val numberOfPosts = if (args.isEmpty) Constants.DefaultNumberOfPosts else args.head.toInt
 
-  val posts = getPosts(numberOfPosts)
-  val bookmarks = posts.map(Bookmark.getBookmarkFromPost)
+  val bookmarks = getPosts(numberOfPosts)
 
   println(bookmarks.mkString("\n"))
 }
