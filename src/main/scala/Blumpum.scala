@@ -81,7 +81,8 @@ object Blumpum extends App {
   }
 
   def getTitleAndUpdatePost(bookmark: Bookmark): HttpResponse[String] = {
-    updatePost(bookmark.url, bookmark.title, bookmark.tags)
+    val title = getPostTitle(bookmark.url)
+    updatePost(bookmark.url, title, bookmark.tags)
   }
 
   def setDescriptionForUntitledPosts(): Unit = {
