@@ -1,4 +1,5 @@
 name := "blumpum"
+organization := "com.sqrt26"
 
 version := "1.0"
 

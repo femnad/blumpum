@@ -1,7 +1,10 @@
+package blumpum
+
 import com.typesafe.config.ConfigFactory
 import org.jsoup.Jsoup
 
 import scalaj.http.{Base64, Http, HttpRequest, HttpResponse}
+
 
 object Constants {
   val BaseApiUrl = "https://api.pinboard.in/v1"
