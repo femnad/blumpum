@@ -102,8 +102,8 @@ object Blumpum extends App {
       .param("url", bookmark.url).asString
   }
 
-  def findPostsTaggedWith(tag: String): Seq[Bookmark] = {
-    getPosts().filter(bookmark => bookmark.tags.contains(tag))
+  def filterBookmarksByTag(bookmarks: Seq[Bookmark], tag: String): Seq[Bookmark] = {
+    bookmarks.filter(bookmark => bookmark.tags.contains(tag))
   }
 
   val numberOfPosts = if (args.isEmpty) Constants.DefaultNumberOfPosts else args.head.toInt
