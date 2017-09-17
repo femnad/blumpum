@@ -53,9 +53,10 @@ object Blumpum extends App {
     Http(url).headers(buildBasicAuthHeader())
   }
 
-  def getPosts(numberOfPosts: Int = 0): Seq[Bookmark] = {
+  def getPosts(numberOfPosts: Int = 0, tag: String = ""): Seq[Bookmark] = {
     val response = authenticatedGetRequest(s"${Constants.BaseApiUrl}/posts/all")
       .param("results", s"$numberOfPosts")
+      .param("tag", tag)
       .asString
 
     if (response.code == 200) {
