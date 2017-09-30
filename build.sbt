@@ -3,7 +3,7 @@ organization := "com.sqrt26"
 
 version := "1.0"
 
-scalaVersion := "2.12.2"
+scalaVersion := "2.12.3"
 
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "2.3.0"
 libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "1.0.6"
